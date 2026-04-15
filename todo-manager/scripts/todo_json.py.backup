@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""
+待办事项 JSON 文件操作脚本
+用于读写和同步 todo.json 文件
+"""
+
+import json
+import os
+from datetime import datetime
+from typing import List, Dict, Optional
+from pathlib import Path
+
+TODO_JSON_PATH = "/workspace/projects/workspace/todo.json"
+
+
+def read_todos() -> List[Dict]:
+    """读取所有待办事项"""
+    if not os.path.exists(TODO_JSON_PATH):
+        return []
+
+    with open(TODO_JSON_PATH, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    return data.get('todos', [])
+
+
+def save_todos(todos: List[Dict]) -> None:
+    """保存所有待办事项到 todo.json"""
+    data = {
+        'todos': todos
+    }
+
+    with open(TODO_JSON_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def add_todo(content: str, priority: str = 'medium') -> int:
+    """添加新的待办事项"""
+    todos = read_todos()
+
+    # 生成新ID（最大ID + 1）
+    max_id = max([t.get('id', 0) for t in todos], default=0)
+    new_id = max_id + 1
+
+    new_todo = {
+        'id': new_id,
+        'content': content,
+        'priority': priority,
+        'created': datetime.now().strftime('%Y-%m-%d'),
+        'completed': False
+    }
+
+    todos.append(new_todo)
+    save_todos(todos)
+
+    return new_id
+
+
+def update_todo(todo_id: int, **kwargs) -> bool:
+    """更新待办事项"""
+    todos = read_todos()
+
+    for todo in todos:
+        if todo.get('id') == todo_id:
+            for key, value in kwargs.items():
+                if key in todo:
+                    todo[key] = value
+            save_todos(todos)
+            return True
+
+    return False
+
+
+def complete_todo(todo_id: int) -> bool:
+    """标记待办事项为已完成"""
+    return update_todo(todo_id, completed=True)
+
+
+def delete_todo(todo_id: int) -> bool:
+    """删除待办事项"""
+    todos = read_todos()
+    original_len = len(todos)
+
+    todos = [t for t in todos if t.get('id') != todo_id]
+
+    if len(todos) < original_len:
+        save_todos(todos)
+        return True
+
+    return False
+
+
+def get_pending_todos() -> List[Dict]:
+    """获取所有未完成的待办"""
+    return [t for t in read_todos() if not t.get('completed', False)]
+
+
+def get_completed_todos() -> List[Dict]:
+    """获取所有已完成的待办"""
+    return [t for t in read_todos() if t.get('completed', False)]
+
+
+def find_todo_by_content(keyword: str) -> Optional[Dict]:
+    """根据关键词查找待办"""
+    for todo in read_todos():
+        if keyword.lower() in todo.get('content', '').lower():
+            return todo
+    return None
+
+
+def get_todos_by_priority(priority: str) -> List[Dict]:
+    """根据优先级获取待办"""
+    return [t for t in read_todos() if t.get('priority', '').lower() == priority.lower()]
+
+
+if __name__ == '__main__':
+    # 测试代码
+    print(f"待办文件路径: {TODO_JSON_PATH}")
+    print(f"文件存在: {os.path.exists(TODO_JSON_PATH)}")
+
+    todos = read_todos()
+    print(f"\n当前待办数量: {len(todos)}")
+    print(f"未完成: {len(get_pending_todos())}")
+    print(f"已完成: {len(get_completed_todos())}")
